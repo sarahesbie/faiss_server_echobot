@@ -1,12 +1,43 @@
 from flask import Flask, request, jsonify
 import faiss
 import numpy as np
+import json
+import os
 
 app = Flask(__name__)
+
+# Define file paths for storing FAISS index and chunks
+INDEX_FILE_PATH = "faiss_index.index"
+CHUNK_STORE_PATH = "chunk_store.json"
 
 # Initialize FAISS index and chunk storage
 index = faiss.IndexFlatL2(1536)  # Dimension size for embeddings
 chunk_store = []  # List to store chunks corresponding to embeddings
+
+# Load saved FAISS index and chunks, if available
+def load_index_and_chunks():
+    global index, chunk_store
+
+    # Load FAISS index
+    if os.path.exists(INDEX_FILE_PATH):
+        index = faiss.read_index(INDEX_FILE_PATH)
+        print("Loaded FAISS index from file.")
+
+    # Load chunk store
+    if os.path.exists(CHUNK_STORE_PATH):
+        with open(CHUNK_STORE_PATH, "r") as f:
+            chunk_store = json.load(f)
+            print("Loaded chunk store from file.")
+
+# Save FAISS index and chunks to disk
+def save_index_and_chunks():
+    faiss.write_index(index, INDEX_FILE_PATH)
+    with open(CHUNK_STORE_PATH, "w") as f:
+        json.dump(chunk_store, f)
+    print("FAISS index and chunk store saved to disk.")
+
+# Load data on startup
+load_index_and_chunks()
 
 # Endpoint to add embeddings to the FAISS index
 @app.route('/add_embeddings', methods=['POST'])
@@ -41,6 +72,9 @@ def add_embeddings():
         # Store the chunks in chunk_store
         chunk_store.extend(chunks)
         print("Chunks successfully stored.")
+
+        # Save the updated index and chunk store to disk
+        save_index_and_chunks()
 
         # Return a success response
         return jsonify({"status": "success", "message": "Embeddings added to FAISS"}), 200
